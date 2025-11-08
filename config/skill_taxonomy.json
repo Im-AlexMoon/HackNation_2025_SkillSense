@@ -1,0 +1,86 @@
+{
+  "technical_skills": {
+    "programming_languages": [
+      "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "Go", "Rust",
+      "Ruby", "PHP", "Swift", "Kotlin", "R", "MATLAB", "Scala", "SQL"
+    ],
+    "web_development": [
+      "React", "Angular", "Vue.js", "Node.js", "Express", "Django", "Flask",
+      "FastAPI", "HTML", "CSS", "JavaScript", "TypeScript", "REST API", "GraphQL",
+      "Next.js", "Nuxt.js", "Svelte", "Tailwind CSS", "Bootstrap"
+    ],
+    "mobile_development": [
+      "React Native", "Flutter", "Swift", "Kotlin", "iOS Development",
+      "Android Development", "Xamarin", "Ionic"
+    ],
+    "data_science": [
+      "Machine Learning", "Deep Learning", "Data Analysis", "Data Visualization",
+      "Pandas", "NumPy", "Scikit-learn", "TensorFlow", "PyTorch", "Keras",
+      "Statistics", "Matplotlib", "Seaborn", "Plotly", "Jupyter", "SQL",
+      "Big Data", "Spark", "Hadoop"
+    ],
+    "cloud_devops": [
+      "AWS", "Azure", "Google Cloud", "Docker", "Kubernetes", "CI/CD",
+      "Jenkins", "GitHub Actions", "Terraform", "Ansible", "Linux", "Bash"
+    ],
+    "databases": [
+      "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "DynamoDB",
+      "Oracle", "SQL Server", "Cassandra", "Neo4j"
+    ],
+    "ai_ml": [
+      "Natural Language Processing", "Computer Vision", "LLMs", "GPT", "BERT",
+      "Transformers", "Prompt Engineering", "Model Fine-tuning", "RAG"
+    ]
+  },
+  "soft_skills": {
+    "communication": [
+      "Written Communication", "Verbal Communication", "Presentation Skills",
+      "Public Speaking", "Technical Writing", "Documentation", "Storytelling"
+    ],
+    "leadership": [
+      "Team Leadership", "Project Management", "Mentoring", "Coaching",
+      "Strategic Planning", "Decision Making", "Conflict Resolution"
+    ],
+    "collaboration": [
+      "Teamwork", "Cross-functional Collaboration", "Stakeholder Management",
+      "Agile Methodologies", "Scrum", "Kanban"
+    ],
+    "problem_solving": [
+      "Critical Thinking", "Analytical Thinking", "Creative Problem Solving",
+      "Debugging", "Troubleshooting", "Research Skills"
+    ],
+    "personal_traits": [
+      "Adaptability", "Self-motivation", "Time Management", "Attention to Detail",
+      "Learning Agility", "Initiative", "Resilience"
+    ]
+  },
+  "domain_knowledge": {
+    "business": [
+      "Product Management", "Business Analysis", "Market Research",
+      "Financial Analysis", "Strategy", "Operations"
+    ],
+    "design": [
+      "UI/UX Design", "Graphic Design", "User Research", "Prototyping",
+      "Wireframing", "Figma", "Adobe XD", "Sketch"
+    ],
+    "industries": [
+      "FinTech", "HealthTech", "EdTech", "E-commerce", "SaaS",
+      "Enterprise Software", "Cybersecurity", "Gaming"
+    ]
+  },
+  "skill_synonyms": {
+    "React": ["React.js", "ReactJS"],
+    "Node.js": ["NodeJS", "Node"],
+    "JavaScript": ["JS", "ECMAScript"],
+    "TypeScript": ["TS"],
+    "Machine Learning": ["ML"],
+    "Deep Learning": ["DL", "Neural Networks"],
+    "Natural Language Processing": ["NLP"],
+    "User Interface": ["UI"],
+    "User Experience": ["UX"],
+    "Continuous Integration": ["CI"],
+    "Continuous Deployment": ["CD"],
+    "Amazon Web Services": ["AWS"],
+    "Google Cloud Platform": ["GCP"]
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "source_reliability_weights": {
+    "github": {
+      "technical_skills": 0.95,
+      "soft_skills": 0.3,
+      "domain_knowledge": 0.6,
+      "description": "High reliability for technical skills, low for soft skills"
+    },
+    "cv": {
+      "technical_skills": 0.8,
+      "soft_skills": 0.6,
+      "domain_knowledge": 0.85,
+      "description": "Generally reliable, but may contain self-reported bias"
+    },
+    "linkedin": {
+      "technical_skills": 0.75,
+      "soft_skills": 0.7,
+      "domain_knowledge": 0.8,
+      "description": "Moderate reliability, endorsements add credibility"
+    },
+    "personal_statement": {
+      "technical_skills": 0.5,
+      "soft_skills": 0.85,
+      "domain_knowledge": 0.6,
+      "description": "High reliability for communication and soft skills analysis"
+    },
+    "reference_letter": {
+      "technical_skills": 0.7,
+      "soft_skills": 0.9,
+      "domain_knowledge": 0.75,
+      "description": "High reliability for soft skills and performance validation"
+    },
+    "personal_webpage": {
+      "technical_skills": 0.65,
+      "soft_skills": 0.55,
+      "domain_knowledge": 0.7,
+      "description": "Moderate reliability, shows technical capability through implementation"
+    }
+  },
+  "skill_detection_methods": {
+    "explicit_mention": {
+      "weight": 1.0,
+      "description": "Direct keyword/phrase match"
+    },
+    "contextual_inference": {
+      "weight": 0.7,
+      "description": "Inferred from project descriptions and context"
+    },
+    "semantic_similarity": {
+      "weight": 0.6,
+      "description": "Related skills detected through embeddings"
+    },
+    "frequency_based": {
+      "weight": 0.8,
+      "description": "Repeated mentions across sources"
+    }
+  },
+  "confidence_thresholds": {
+    "high": 0.75,
+    "medium": 0.5,
+    "low": 0.3,
+    "description": "Thresholds for categorizing skill confidence levels"
+  }
+}

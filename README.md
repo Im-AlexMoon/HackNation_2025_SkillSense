@@ -25,6 +25,7 @@ By analyzing data from multiple sources (CV, GitHub, personal statements, refere
 - **Learning Path Generator**: Personalized upskilling recommendations
 - **Evidence-Based Transparency**: Every skill links back to source evidence
 - **Multi-Modal Analysis**: Combines technical (GitHub) and soft skills (writing)
+- **🆕 RAG-Powered Q&A**: Employers can ask natural language questions about candidates ("Does this candidate know Kubernetes?")
 
 ---
 
@@ -156,6 +157,7 @@ SkillSense/
 | **Visualization** | Plotly |
 | **Data Processing** | pandas, numpy |
 | **Package Manager** | uv |
+| **RAG System** | FAISS, OpenAI/Gemini/Anthropic |
 
 ---
 
@@ -181,6 +183,13 @@ SkillSense/
 - **Skill Overlap**: Calculate match % based on required vs possessed skills
 - **Gap Analysis**: Identify missing critical and beneficial skills
 - **Learning Recommendations**: Suggest prioritized upskilling paths
+
+### 5. RAG-Powered Q&A (NEW!)
+- **Vector Search**: FAISS indexes skills + CV text + GitHub data for semantic search
+- **LLM Integration**: Multi-provider support (Gemini/OpenAI/Anthropic)
+- **Context Retrieval**: Finds relevant profile information for each question
+- **Evidence Citations**: Every answer links back to source documents
+- **Conversation Memory**: Maintains context across multi-turn conversations
 
 ---
 

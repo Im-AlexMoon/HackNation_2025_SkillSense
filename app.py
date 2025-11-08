@@ -15,6 +15,8 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 
 from profile_generation.profile_builder import ProfileBuilder
 from analysis.job_matcher import JobMatcher
+from rag.rag_system import RAGSystem
+from rag.prompts import QUICK_QUESTIONS
 
 
 # Page configuration
@@ -325,6 +327,185 @@ def create_radar_chart(skills):
     return fig
 
 
+def render_employer_qa_page():
+    """Render Employer Q&A page with RAG system"""
+    if st.session_state.profile is None:
+        st.warning("⚠️ Please build a candidate profile first in the Data Input page")
+        return
+
+    st.header("💬 Employer Q&A - Ask About This Candidate")
+    st.markdown("Ask natural language questions about the candidate's skills, experience, and qualifications")
+
+    # Sidebar settings
+    with st.sidebar:
+        st.subheader("🔧 RAG Settings")
+
+        # LLM Provider selection
+        llm_provider = st.selectbox(
+            "LLM Provider",
+            ["gemini", "openai", "anthropic"],
+            help="Gemini is free tier, OpenAI and Anthropic require API keys"
+        )
+
+        # API Key input (optional)
+        with st.expander("⚙️ API Configuration"):
+            api_key_input = st.text_input(
+                f"{llm_provider.upper()} API Key",
+                type="password",
+                help=f"Optional: Enter your {llm_provider.upper()} API key"
+            )
+
+        # Display options
+        show_evidence = st.checkbox("Show Evidence Citations", value=True)
+        show_similarity = st.checkbox("Show Similarity Scores", value=False)
+
+        st.divider()
+
+        # Profile info
+        st.subheader("📊 Candidate Info")
+        st.write(f"**Name:** {st.session_state.profile.name or 'Unknown'}")
+        st.metric("Total Skills", len(st.session_state.profile.skills))
+        st.metric("Data Sources", len(st.session_state.profile.data_sources))
+
+        # Reset conversation button
+        if st.button("🔄 Reset Conversation"):
+            if 'rag_system' in st.session_state:
+                st.session_state.rag_system.reset_conversation()
+            if 'chat_messages' in st.session_state:
+                st.session_state.chat_messages = []
+            st.rerun()
+
+    # Initialize RAG system
+    if 'rag_system' not in st.session_state or st.session_state.get('rag_provider') != llm_provider:
+        with st.spinner(f"🔍 Initializing RAG system with {llm_provider}..."):
+            try:
+                api_key = api_key_input if api_key_input else None
+                st.session_state.rag_system = RAGSystem(
+                    st.session_state.profile,
+                    llm_provider=llm_provider,
+                    api_key=api_key
+                )
+                st.session_state.rag_provider = llm_provider
+                st.success(f"✅ RAG system ready with {llm_provider}")
+            except Exception as e:
+                st.error(f"❌ Error initializing RAG system: {str(e)}")
+                st.info("💡 Tip: For Gemini, you may not need an API key. For OpenAI/Anthropic, enter your API key in the sidebar.")
+                return
+
+    # Initialize chat history
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
+
+    # Display chat history
+    for msg in st.session_state.chat_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+            # Show evidence if available and enabled
+            if show_evidence and msg.get("sources") and msg["role"] == "assistant":
+                with st.expander("📚 View Evidence & Sources"):
+                    for i, src in enumerate(msg["sources"], 1):
+                        st.markdown(f"**[{i}] {src['type'].replace('_', ' ').title()}**")
+                        st.info(src['text'])
+
+                        if show_similarity:
+                            st.caption(f"Similarity: {src.get('similarity', 0):.2f}")
+
+                        if src.get('skill_name'):
+                            st.caption(f"Skill: {src['skill_name']} | Confidence: {src.get('confidence', 0):.2f}")
+
+    # Chat input
+    if prompt := st.chat_input("Ask about this candidate... (e.g., 'Does this candidate have Python experience?')"):
+        # Add user message
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Generate response
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing profile..."):
+                try:
+                    answer, sources = st.session_state.rag_system.query(prompt)
+
+                    # Display answer
+                    st.markdown(answer)
+
+                    # Add to chat history
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": sources
+                    })
+
+                    # Show evidence
+                    if show_evidence and sources:
+                        with st.expander("📚 View Evidence & Sources"):
+                            for i, src in enumerate(sources, 1):
+                                st.markdown(f"**[{i}] {src['type'].replace('_', ' ').title()}**")
+                                st.info(src['text'])
+
+                                if show_similarity:
+                                    st.caption(f"Similarity: {src.get('similarity', 0):.2f}")
+
+                                if src.get('skill_name'):
+                                    st.caption(f"Skill: {src['skill_name']} | Confidence: {src.get('confidence', 0):.2f}")
+
+                except Exception as e:
+                    error_msg = f"❌ Error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": error_msg,
+                        "sources": []
+                    })
+
+        st.rerun()
+
+    # Quick question templates
+    if len(st.session_state.chat_messages) == 0:
+        st.divider()
+        st.subheader("💡 Quick Question Templates")
+        st.markdown("Click a question to ask it:")
+
+        # Create tabs for question categories
+        tabs = st.tabs(list(QUICK_QUESTIONS.keys()))
+
+        for tab, (category, questions) in zip(tabs, QUICK_QUESTIONS.items()):
+            with tab:
+                for question in questions:
+                    if st.button(question, key=f"quick_{category}_{question[:20]}"):
+                        # Trigger query
+                        st.session_state.pending_query = question
+                        st.rerun()
+
+        # Handle pending query
+        if 'pending_query' in st.session_state:
+            query = st.session_state.pending_query
+            del st.session_state.pending_query
+
+            # Add to chat and process
+            st.session_state.chat_messages.append({"role": "user", "content": query})
+
+            with st.spinner("Analyzing profile..."):
+                try:
+                    answer, sources = st.session_state.rag_system.query(query)
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": sources
+                    })
+                except Exception as e:
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": f"Error: {str(e)}",
+                        "sources": []
+                    })
+
+            st.rerun()
+
+
 def render_export_page():
     """Render export and download page"""
     if st.session_state.profile is None:
@@ -395,7 +576,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to:",
-        ["🏠 Home", "📊 Data Input", "🎓 Skill Profile", "💼 Job Matching", "💾 Export"]
+        ["🏠 Home", "📊 Data Input", "🎓 Skill Profile", "💼 Job Matching", "💬 Employer Q&A", "💾 Export"]
     )
 
     # Demo mode
@@ -456,6 +637,9 @@ def main():
 
     elif page == "💼 Job Matching":
         render_job_matching_page()
+
+    elif page == "💬 Employer Q&A":
+        render_employer_qa_page()
 
     elif page == "💾 Export":
         render_export_page()

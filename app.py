@@ -491,7 +491,13 @@ def render_skill_profile_page():
         )
 
     with col_filter3:
-        sources_list = ["All"] + sorted(set([s for skills in profile.skill_categories.values() for s in [item for sublist in [ss.sources for ss in skills] for item]]))
+        # Extract unique sources from all skills
+        all_sources = set()
+        for skill in profile.skills:
+            if hasattr(skill, 'sources'):
+                all_sources.update(skill.sources)
+        sources_list = ["All"] + sorted(list(all_sources)) if all_sources else ["All"]
+
         selected_source = st.selectbox(
             "Filter by Source",
             sources_list,

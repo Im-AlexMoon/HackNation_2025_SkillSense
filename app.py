@@ -506,66 +506,6 @@ def render_skill_profile_page():
 
     st.markdown("---")
 
-    # Top Skills with Radar Chart
-    st.subheader("🏆 Top Skills Overview")
-
-    col_charts1, col_charts2 = st.columns([1.5, 1])
-
-    with col_charts1:
-        if profile.top_skills:
-            from src.visualization import create_confidence_distribution
-            filtered_skills = [s for s in profile.skills if s.final_confidence >= confidence_min]
-            confidences = [s.final_confidence for s in filtered_skills]
-
-            if confidences:
-                fig_dist = create_confidence_distribution(confidences)
-                st.plotly_chart(fig_dist, use_container_width=True)
-
-    with col_charts2:
-        if profile.top_skills:
-            from src.visualization import create_category_breakdown
-            category_counts = {}
-            for category, skills in profile.skill_categories.items():
-                filtered = [s for s in skills if s.final_confidence >= confidence_min]
-                if filtered:
-                    category_counts[category.replace('_', ' ').title()] = len(filtered)
-
-            if category_counts:
-                fig_category = create_category_breakdown(category_counts)
-                st.plotly_chart(fig_category, use_container_width=True)
-
-    st.markdown("---")
-
-    # Source Contribution & Detection Methods
-    col_charts3, col_charts4 = st.columns(2)
-
-    with col_charts3:
-        from src.visualization import create_source_contribution
-        source_counts = {}
-        for skill in profile.skills:
-            if skill.final_confidence >= confidence_min:
-                for source in skill.sources:
-                    source_counts[source] = source_counts.get(source, 0) + 1
-
-        if source_counts:
-            fig_sources = create_source_contribution(source_counts)
-            st.plotly_chart(fig_sources, use_container_width=True)
-
-    with col_charts4:
-        from src.visualization import create_detection_method_breakdown
-        method_counts = {"explicit": 0, "contextual": 0, "semantic": 0}
-        for skill in profile.skills:
-            if skill.final_confidence >= confidence_min:
-                for method_key in method_counts:
-                    if method_key in skill.confidence_breakdown:
-                        method_counts[method_key] += 1
-
-        if any(method_counts.values()):
-            fig_methods = create_detection_method_breakdown(method_counts)
-            st.plotly_chart(fig_methods, use_container_width=True)
-
-    st.markdown("---")
-
     # Detailed Skills by Category with Badges
     st.subheader("📚 Skills by Category")
 
@@ -602,18 +542,30 @@ def render_skill_profile_page():
     # Detailed Evidence View
     st.subheader("🔍 Detailed Evidence & Sources")
 
-    from src.visualization import create_skill_detail_card
-
     for skill in profile.top_skills[:15]:
         if skill.final_confidence >= confidence_min:
+            # Create evidence text list from skill object
+            evidence_list = []
+            if hasattr(skill, 'evidence'):
+                for ev in skill.evidence[:3]:
+                    if isinstance(ev, str):
+                        evidence_list.append(ev)
+                    elif hasattr(ev, 'text'):
+                        evidence_list.append(ev.text)
+                    elif hasattr(ev, '__str__'):
+                        evidence_list.append(str(ev))
+
+            # Get category from skill object if available
+            category = skill.category if hasattr(skill, 'category') else "Unknown"
+
+            from src.visualization import create_skill_detail_card
             create_skill_detail_card(
                 skill_name=skill.skill_name,
                 confidence=skill.final_confidence,
-                category="Unknown",
+                category=category,
                 sources=skill.sources,
-                evidence=skill.evidence[:3]
+                evidence=evidence_list
             )
-            st.markdown("")  # Spacing
 
 
 def render_job_matching_page():
@@ -691,8 +643,7 @@ def render_job_matching_page():
                 "company": "",
                 "match_score": match.match_score,
                 "matched_skills": len(match.matched_skills),
-                "missing_skills": len(match.missing_required) + len(match.missing_preferred),
-                "description": match.recommendation[:100] + "..." if match.recommendation else ""
+                "missing_skills": len(match.missing_required) + len(match.missing_preferred)
             })
 
         create_job_cards_grid(job_data, columns=3)
@@ -1340,14 +1291,14 @@ Data Sources: {', '.join(profile.data_sources)}
 
 
 def render_dashboard_page():
-    """Render executive dashboard with overview visualizations and Sankey diagram"""
+    """Render executive dashboard with career readiness summary"""
     if st.session_state.profile is None:
         st.warning("⚠️ Please build a profile first in the Data Input page")
         return
 
     profile = st.session_state.profile
     st.header("📈 Executive Dashboard")
-    st.markdown("Comprehensive overview of your skill profile and career readiness")
+    st.markdown("Your career readiness and top skills summary")
 
     # Header metrics
     from src.visualization import create_metric_grid, create_info_card
@@ -1371,245 +1322,100 @@ def render_dashboard_page():
 
     st.markdown("---")
 
-    # Create tabs for different dashboard views
-    tab1, tab2, tab3 = st.tabs(["📊 Overview", "🔀 Skill Flow", "📋 Summary"])
+    st.subheader("📋 Career Readiness Summary")
 
-    with tab1:
-        st.subheader("Skill Distribution & Confidence Overview")
+    # Create summary cards
+    col1, col2 = st.columns(2)
 
-        col_dist, col_gauge = st.columns(2)
-
-        with col_dist:
-            st.markdown("**Confidence Level Distribution**")
-            from src.visualization import create_confidence_distribution
-            confidences = [s.final_confidence for s in profile.skills]
-            if confidences:
-                fig_dist = create_confidence_distribution(confidences)
-                st.plotly_chart(fig_dist, use_container_width=True)
-
-        with col_gauge:
-            st.markdown("**Overall Profile Completeness**")
-            from src.visualization import create_profile_completeness_gauge
-            fig_gauge = create_profile_completeness_gauge(profile_completeness)
-            st.plotly_chart(fig_gauge, use_container_width=True)
-
-        st.markdown("---")
-
-        col_cat, col_src = st.columns(2)
-
-        with col_cat:
-            st.markdown("**Skills by Category**")
-            from src.visualization import create_category_breakdown
-            category_counts = {}
-            for skill in profile.skills:
-                cat = skill.category if hasattr(skill, 'category') else 'Other'
-                category_counts[cat] = category_counts.get(cat, 0) + 1
-            if category_counts:
-                fig_cat = create_category_breakdown(category_counts)
-                st.plotly_chart(fig_cat, use_container_width=True)
-
-        with col_src:
-            st.markdown("**Skills by Data Source**")
-            from src.visualization import create_source_contribution
-            source_counts = {}
-            for skill in profile.skills:
-                for source in skill.sources if hasattr(skill, 'sources') else []:
-                    source_counts[source] = source_counts.get(source, 0) + 1
-            if source_counts:
-                fig_src = create_source_contribution(source_counts)
-                st.plotly_chart(fig_src, use_container_width=True)
-
-    with tab2:
-        st.subheader("📊 Skill Flow Diagram")
-
-        # Create Sankey diagram showing skill flow from sources to categories to confidence levels
-        import plotly.graph_objects as go
-
-        # Prepare data for Sankey
-        sources_list = list(set([s for skill in profile.skills for s in (skill.sources if hasattr(skill, 'sources') else [])]))
-        categories_list = list(set([skill.category if hasattr(skill, 'category') else 'Other' for skill in profile.skills]))
-        confidence_levels = ["High Confidence (75%+)", "Medium Confidence (50-75%)", "Low Confidence (<50%)"]
-
-        # Build nodes
-        all_nodes = sources_list + categories_list + confidence_levels
-        node_colors = (
-            ['#3B82F6'] * len(sources_list) +  # Blue for sources
-            ['#8B5CF6'] * len(categories_list) +  # Purple for categories
-            ['#10B981', '#F59E0B', '#EF4444']  # Green, Amber, Red for confidence
+    with col1:
+        create_info_card(
+            title="Skill Strength",
+            content=f"You have identified <strong>{total_skills} unique skills</strong> with an average confidence of <strong>{sum(s.final_confidence for s in profile.skills) / total_skills if total_skills > 0 else 0:.0%}</strong>. "
+            f"<strong>{high_conf}</strong> skills have high confidence scores (75%+).",
+            color="success",
+            icon="💪"
         )
 
-        # Create mappings
-        node_dict = {node: idx for idx, node in enumerate(all_nodes)}
-
-        # Build links
-        source_indices = []
-        target_indices = []
-        values = []
-        link_colors = []
-
-        # Source to Category links
-        for skill in profile.skills:
-            sources = skill.sources if hasattr(skill, 'sources') else []
-            category = skill.category if hasattr(skill, 'category') else 'Other'
-
-            for source in sources:
-                if source in node_dict and category in node_dict:
-                    source_indices.append(node_dict[source])
-                    target_indices.append(node_dict[category])
-                    values.append(1)
-                    link_colors.append('rgba(59, 130, 246, 0.4)')
-
-        # Category to Confidence links
-        for skill in profile.skills:
-            category = skill.category if hasattr(skill, 'category') else 'Other'
-            confidence = skill.final_confidence
-
-            if confidence >= 0.75:
-                conf_level = "High Confidence (75%+)"
-                color = 'rgba(16, 185, 129, 0.4)'
-            elif confidence >= 0.5:
-                conf_level = "Medium Confidence (50-75%)"
-                color = 'rgba(245, 158, 11, 0.4)'
-            else:
-                conf_level = "Low Confidence (<50%)"
-                color = 'rgba(239, 68, 68, 0.4)'
-
-            if category in node_dict and conf_level in node_dict:
-                source_indices.append(node_dict[category])
-                target_indices.append(node_dict[conf_level])
-                values.append(1)
-                link_colors.append(color)
-
-        # Create Sankey
-        fig_sankey = go.Figure(
-            data=[
-                go.Sankey(
-                    node=dict(
-                        pad=15,
-                        thickness=20,
-                        line=dict(color='black', width=0.5),
-                        label=all_nodes,
-                        color=node_colors,
-                    ),
-                    link=dict(
-                        source=source_indices,
-                        target=target_indices,
-                        value=values,
-                        color=link_colors,
-                    ),
-                )
-            ]
+    with col2:
+        create_info_card(
+            title="Profile Coverage",
+            content=f"Your profile is <strong>{int(profile_completeness * 100)}% complete</strong>. "
+            f"You have provided <strong>{len(profile.data_sources)} data sources</strong>, which helps ensure comprehensive skill extraction.",
+            color="secondary",
+            icon="📚"
         )
 
-        fig_sankey.update_layout(
-            title="Skill Flow: From Sources to Confidence Levels",
-            font=dict(size=10),
-            height=600,
-            margin=dict(l=50, r=50, t=100, b=50),
-        )
+    st.markdown("---")
 
-        st.plotly_chart(fig_sankey, use_container_width=True)
+    # Top skills section
+    st.subheader("⭐ Top 10 Skills by Confidence")
 
-        st.info(
-            "📌 This Sankey diagram shows how your skills flow from their sources (CV, GitHub, etc.) "
-            "through skill categories and into confidence levels. "
-            "Thicker flows indicate more skills in that pathway."
-        )
+    top_skills = sorted(profile.skills, key=lambda s: s.final_confidence, reverse=True)[:10]
 
-    with tab3:
-        st.subheader("📋 Career Readiness Summary")
+    for idx, skill in enumerate(top_skills, 1):
+        from src.visualization import get_confidence_color
 
-        # Create summary cards
-        col1, col2 = st.columns(2)
+        # Create a custom progress bar for each skill
+        conf = skill.final_confidence
+        color = get_confidence_color(conf) if hasattr(skill, 'final_confidence') else "#3B82F6"
+        skill_name = skill.skill_name if hasattr(skill, 'skill_name') else getattr(skill, 'name', 'Unknown')
 
-        with col1:
-            create_info_card(
-                title="Skill Strength",
-                content=f"You have identified <strong>{total_skills} unique skills</strong> with an average confidence of <strong>{sum(s.final_confidence for s in profile.skills) / total_skills if total_skills > 0 else 0:.0%}</strong>. "
-                f"<strong>{high_conf}</strong> skills have high confidence scores (75%+).",
-                color="success",
-                icon="💪"
-            )
-
-        with col2:
-            create_info_card(
-                title="Profile Coverage",
-                content=f"Your profile is <strong>{int(profile_completeness * 100)}% complete</strong>. "
-                f"You have provided <strong>{len(profile.data_sources)} data sources</strong>, which helps ensure comprehensive skill extraction.",
-                color="secondary",
-                icon="📚"
-            )
-
-        st.markdown("---")
-
-        # Top skills section
-        st.subheader("⭐ Top 10 Skills by Confidence")
-
-        top_skills = sorted(profile.skills, key=lambda s: s.final_confidence, reverse=True)[:10]
-
-        for idx, skill in enumerate(top_skills, 1):
-            from src.visualization import get_confidence_color
-
-            # Create a custom progress bar for each skill
-            conf = skill.final_confidence
-            color = get_confidence_color(conf) if hasattr(skill, 'final_confidence') else "#3B82F6"
-
-            skill_row = f"""
-            <div style="
-                padding: 1rem;
-                margin-bottom: 0.75rem;
-                border-radius: 8px;
-                background: white;
-                border: 1px solid #E5E7EB;
-            ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <div style="font-weight: 700; color: #0F172A;">
-                        {idx}. {skill.name}
-                    </div>
-                    <div style="font-size: 0.875rem; color: {color}; font-weight: 700;">
-                        {skill.final_confidence:.0%}
-                    </div>
+        skill_row = f"""
+        <div style="
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid #E5E7EB;
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <div style="font-weight: 700; color: #0F172A;">
+                    {idx}. {skill_name}
                 </div>
-                <div style="
-                    width: 100%;
-                    height: 8px;
-                    background-color: #E5E7EB;
-                    border-radius: 4px;
-                    overflow: hidden;
-                ">
-                    <div style="
-                        height: 100%;
-                        width: {skill.final_confidence * 100}%;
-                        background-color: {color};
-                        border-radius: 4px;
-                    "></div>
+                <div style="font-size: 0.875rem; color: {color}; font-weight: 700;">
+                    {skill.final_confidence:.0%}
                 </div>
             </div>
-            """
-            st.markdown(skill_row, unsafe_allow_html=True)
+            <div style="
+                width: 100%;
+                height: 8px;
+                background-color: #E5E7EB;
+                border-radius: 4px;
+                overflow: hidden;
+            ">
+                <div style="
+                    height: 100%;
+                    width: {skill.final_confidence * 100}%;
+                    background-color: {color};
+                    border-radius: 4px;
+                "></div>
+            </div>
+        </div>
+        """
+        st.markdown(skill_row, unsafe_allow_html=True)
 
-        st.markdown("---")
+    st.markdown("---")
 
-        # Recommendations
-        st.subheader("💡 Next Steps")
+    # Recommendations
+    st.subheader("💡 Next Steps")
 
-        recommendations = []
+    recommendations = []
 
-        if profile_completeness < 0.6:
-            recommendations.append("📌 **Expand Your Skills**: You have identified several skills. Consider adding more sources (references, projects) to discover additional competencies.")
+    if profile_completeness < 0.6:
+        recommendations.append("📌 **Expand Your Skills**: You have identified several skills. Consider adding more sources (references, projects) to discover additional competencies.")
 
-        if low_conf > high_conf:
-            recommendations.append("📌 **Validate Your Skills**: You have many skills with medium or low confidence. Add more evidence from your CV or work samples to strengthen these.")
+    if low_conf > high_conf:
+        recommendations.append("📌 **Validate Your Skills**: You have many skills with medium or low confidence. Add more evidence from your CV or work samples to strengthen these.")
 
-        if len(profile.data_sources) < 3:
-            recommendations.append("📌 **Diversify Your Sources**: Adding a GitHub profile, personal statement, or references will provide a more comprehensive skill picture.")
+    if len(profile.data_sources) < 3:
+        recommendations.append("📌 **Diversify Your Sources**: Adding a GitHub profile, personal statement, or references will provide a more comprehensive skill picture.")
 
-        if total_skills > 0:
-            recommendations.append("📌 **Review Your Profile**: Visit the **🎓 Skill Profile** page to see detailed skill breakdown and evidence.")
-            recommendations.append("📌 **Explore Job Matches**: Head to **💼 Job Matching** to discover opportunities that align with your skills.")
+    if total_skills > 0:
+        recommendations.append("📌 **Review Your Profile**: Visit the **🎓 Skill Profile** page to see detailed skill breakdown and evidence.")
+        recommendations.append("📌 **Explore Job Matches**: Head to **💼 Job Matching** to discover opportunities that align with your skills.")
 
-        for rec in recommendations:
-            st.info(rec, icon="✨")
+    for rec in recommendations:
+        st.info(rec, icon="✨")
 
 
 def main():

@@ -280,7 +280,7 @@ SkillSense directly addresses the SAP Corporate Track challenge:
 
 ## 👥 Team
 
-Built for HackNation 2025 by [Your Team Name]
+Built for HackNation 2025 by Alexander Moon & JETS
 
 ---
 

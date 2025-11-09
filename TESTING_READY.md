@@ -4,11 +4,17 @@
 
 All critical bugs have been identified, fixed, and tested. The RAG system is now stable and ready for your hands-on testing.
 
+### Latest Critical Fix (v2) ✅
+**RetryError Issue RESOLVED** - Gemini API error messages now clear and helpful
+- Previously: `RetryError[<Future at 0x... state=finished raised Exception>]`
+- Now: `Gemini API key not found. Get a free key at: https://makersuite.google.com/app/apikey`
+- See `GEMINI_RETRYERROR_FIXED.md` for details
+
 ---
 
 ## What Was Fixed
 
-### 🐛 7 Critical Bugs Fixed
+### 🐛 7 Critical Bugs Fixed (Initial Round)
 1. ✅ Import path validation
 2. ✅ Gemini API key handling
 3. ✅ Chat history clearing on provider switch
@@ -16,6 +22,9 @@ All critical bugs have been identified, fixed, and tested. The RAG system is now
 5. ✅ Profile data structure robustness
 6. ✅ GitHub repository validation
 7. ✅ LLM response validation for all 3 providers
+
+### 🔴 Critical Issue Fixed (v2)
+8. ✅ **Gemini RetryError** - Now shows actual error with helpful guidance
 
 ### 🔧 Bonus Fixes
 - ✅ Windows Unicode compatibility (removed problematic emojis)

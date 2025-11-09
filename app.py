@@ -99,33 +99,56 @@ def render_header():
 
 
 def render_data_input_page():
-    """Render data input page"""
+    """Render data input page - supports simultaneous multi-source input"""
     st.header("📊 Data Input")
-    st.markdown("Provide your information from multiple sources for comprehensive skill analysis")
+    st.markdown("Provide information from **multiple sources** for comprehensive skill analysis. You can use any combination of sources below:")
 
-    # Create tabs for different input methods
-    tab1, tab2, tab3 = st.tabs(["📄 Upload CV", "💻 Connect GitHub", "✍️ Text Input"])
+    # Initialize session state for collected inputs
+    if 'collected_inputs' not in st.session_state:
+        st.session_state.collected_inputs = {}
 
-    with tab1:
-        st.subheader("Upload Your CV (PDF)")
-        cv_file = st.file_uploader("Upload CV in PDF format", type=['pdf'])
-        if cv_file:
-            # Save uploaded file temporarily
-            temp_path = Path("temp_cv.pdf")
-            with open(temp_path, 'wb') as f:
-                f.write(cv_file.getbuffer())
-            st.success("✅ CV uploaded successfully!")
-            return {'cv_path': str(temp_path)}
+    # Dictionary to accumulate all inputs from this render
+    inputs = {}
 
-    with tab2:
-        st.subheader("Connect Your GitHub Profile")
-        github_username = st.text_input("GitHub Username", placeholder="e.g., octocat")
+    # Section 1: CV Upload (supports multiple files)
+    with st.expander("📄 Upload CV(s)", expanded=True):
+        st.markdown("Upload one or more CVs in PDF format")
+        cv_files = st.file_uploader(
+            "Upload CV(s) in PDF format",
+            type=['pdf'],
+            accept_multiple_files=True,
+            key="cv_uploader"
+        )
+
+        if cv_files:
+            import uuid
+            cv_paths = []
+            for idx, cv_file in enumerate(cv_files):
+                # Generate unique temp file name
+                temp_path = Path(f"temp_cv_{uuid.uuid4().hex[:8]}.pdf")
+                with open(temp_path, 'wb') as f:
+                    f.write(cv_file.getbuffer())
+                cv_paths.append(str(temp_path))
+
+            inputs['cv_paths'] = cv_paths
+            st.success(f"CV(s) uploaded: {len(cv_paths)} file(s)")
+
+    # Section 2: GitHub Connection
+    with st.expander("💻 Connect GitHub Profile", expanded=True):
+        st.markdown("Fetch repositories, contributions, and project data")
+        github_username = st.text_input(
+            "GitHub Username",
+            placeholder="e.g., octocat",
+            key="github_input"
+        )
+
         if github_username:
+            inputs['github_username'] = github_username
             st.info(f"Will fetch data for: github.com/{github_username}")
-            return {'github_username': github_username}
 
-    with tab3:
-        st.subheader("Provide Text Information")
+    # Section 3: Text Input
+    with st.expander("✍️ Text Input", expanded=True):
+        st.markdown("Provide additional context through text")
 
         col1, col2 = st.columns(2)
 
@@ -133,41 +156,91 @@ def render_data_input_page():
             personal_statement = st.text_area(
                 "Personal Statement",
                 placeholder="Describe your background, skills, and career goals...",
-                height=200
+                height=200,
+                key="statement_input"
             )
 
         with col2:
             reference_letter = st.text_area(
                 "Reference Letter (Optional)",
                 placeholder="Paste a reference letter or recommendation...",
-                height=200
+                height=200,
+                key="reference_input"
             )
 
         if personal_statement:
-            return {
-                'personal_statement': personal_statement,
-                'reference_letter': reference_letter if reference_letter else None
-            }
+            inputs['personal_statement'] = personal_statement
+        if reference_letter:
+            inputs['reference_letter'] = reference_letter
+
+    # Display collected sources summary
+    if inputs:
+        st.markdown("---")
+        st.subheader("📋 Collected Sources")
+
+        sources = []
+        if 'cv_paths' in inputs:
+            sources.append(f"CV(s): {len(inputs['cv_paths'])} file(s)")
+        if 'github_username' in inputs:
+            sources.append(f"GitHub: {inputs['github_username']}")
+        if 'personal_statement' in inputs:
+            sources.append("Personal Statement")
+        if 'reference_letter' in inputs:
+            sources.append("Reference Letter")
+
+        for source in sources:
+            st.markdown(f"- {source}")
+
+        return inputs
 
     return None
 
 
 def build_profile_from_inputs(inputs: dict):
-    """Build profile from user inputs"""
-    with st.spinner("🔍 Analyzing your data and extracting skills..."):
+    """Build profile from user inputs - supports multi-source simultaneous processing"""
+    # Display processing progress
+    sources_to_process = []
+    if inputs.get('cv_paths'):
+        sources_to_process.append(f"{len(inputs['cv_paths'])} CV file(s)")
+    if inputs.get('github_username'):
+        sources_to_process.append("GitHub")
+    if inputs.get('personal_statement'):
+        sources_to_process.append("Personal Statement")
+    if inputs.get('reference_letter'):
+        sources_to_process.append("Reference Letter")
+
+    progress_text = f"Processing: {', '.join(sources_to_process)}"
+
+    with st.spinner(f"🔍 {progress_text}..."):
         try:
+            # Build profile with all sources
             profile = st.session_state.profile_builder.build_profile(
                 name=inputs.get('name', 'User'),
-                cv_path=inputs.get('cv_path'),
+                cv_paths=inputs.get('cv_paths'),  # Now supports multiple CVs
                 github_username=inputs.get('github_username'),
                 personal_statement=inputs.get('personal_statement'),
                 reference_letter=inputs.get('reference_letter')
             )
             st.session_state.profile = profile
-            st.success("✅ Profile analysis complete!")
+
+            # Show success with source breakdown
+            st.success("Profile analysis complete!")
+
+            # Display which sources contributed
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Skills", len(profile.skills))
+            with col2:
+                st.metric("Data Sources", len(profile.data_sources))
+            with col3:
+                sources_list = ', '.join(profile.data_sources)
+                st.metric("Sources Used", sources_list)
+
             return True
         except Exception as e:
-            st.error(f"❌ Error building profile: {str(e)}")
+            st.error(f"Error building profile: {str(e)}")
+            import traceback
+            st.error(f"Details: {traceback.format_exc()}")
             return False
 
 

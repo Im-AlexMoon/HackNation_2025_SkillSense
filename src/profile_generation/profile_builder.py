@@ -46,6 +46,7 @@ class ProfileBuilder:
         self,
         name: Optional[str] = None,
         cv_path: Optional[str] = None,
+        cv_paths: Optional[List[str]] = None,
         github_username: Optional[str] = None,
         personal_statement: Optional[str] = None,
         reference_letter: Optional[str] = None,
@@ -56,7 +57,8 @@ class ProfileBuilder:
 
         Args:
             name: Person's name
-            cv_path: Path to CV PDF
+            cv_path: Path to single CV PDF (deprecated, use cv_paths)
+            cv_paths: List of paths to CV PDFs (supports multiple CVs)
             github_username: GitHub username
             personal_statement: Personal statement text
             reference_letter: Reference letter text
@@ -69,21 +71,40 @@ class ProfileBuilder:
         data_sources = []
         raw_data = {}
 
-        # Process CV
-        if cv_path:
-            print(f"📄 Processing CV from {cv_path}...")
-            try:
-                cv_data = self.pdf_extractor.extract_structured_cv(cv_path)
-                cv_skills = self.skill_extractor.extract_all_skills(
-                    cv_data['raw_text'],
-                    source='cv'
-                )
-                all_extracted_skills.extend(cv_skills)
+        # Handle backward compatibility: convert single cv_path to list
+        if cv_path and not cv_paths:
+            cv_paths = [cv_path]
+
+        # Process CV(s) - supports multiple files
+        if cv_paths:
+            print(f"📄 Processing {len(cv_paths)} CV file(s)...")
+            all_cv_data = []
+            combined_cv_text = []
+
+            for idx, cv_file_path in enumerate(cv_paths):
+                try:
+                    print(f"   Processing CV {idx + 1}/{len(cv_paths)}: {cv_file_path}")
+                    cv_data = self.pdf_extractor.extract_structured_cv(cv_file_path)
+                    cv_skills = self.skill_extractor.extract_all_skills(
+                        cv_data['raw_text'],
+                        source=f'cv_{idx + 1}'
+                    )
+                    all_extracted_skills.extend(cv_skills)
+                    all_cv_data.append(cv_data)
+                    combined_cv_text.append(cv_data['raw_text'])
+                    print(f"      Found {len(cv_skills)} skills from CV {idx + 1}")
+                except Exception as e:
+                    print(f"      Error processing CV {idx + 1}: {str(e)}")
+
+            if all_cv_data:
                 data_sources.append('cv')
-                raw_data['cv'] = cv_data
-                print(f"   ✓ Found {len(cv_skills)} skills from CV")
-            except Exception as e:
-                print(f"   ✗ Error processing CV: {str(e)}")
+                # Store all CVs with combined text for RAG
+                raw_data['cv'] = {
+                    'files': all_cv_data,
+                    'raw_text': '\n\n'.join(combined_cv_text),
+                    'count': len(all_cv_data)
+                }
+                print(f"   Total CV skills extracted: {sum(1 for s in all_extracted_skills if s.source.startswith('cv'))}")
 
         # Process GitHub
         if github_username:

@@ -31,7 +31,7 @@ class RAGSystem:
         self.llm = LLMClient(provider=llm_provider, api_key=api_key)
         self.conversation_history = []
 
-        print(f"\n🔍 Initializing RAG system with {llm_provider}...")
+        print(f"\nInitializing RAG system with {llm_provider}...")
         self._index_profile()
 
     def _index_profile(self):
@@ -40,65 +40,83 @@ class RAGSystem:
         metadatas = []
 
         # Index skills
-        print(f"   Indexing {len(self.profile.skills)} skills...")
-        for skill in self.profile.skills:
-            text = self._skill_to_text(skill)
-            documents.append(text)
-            metadatas.append({
-                "type": "skill",
-                "skill_name": skill.skill_name,
-                "confidence": skill.final_confidence,
-                "category": skill.category,
-                "sources": skill.sources
-            })
+        if hasattr(self.profile, 'skills') and self.profile.skills:
+            print(f"   Indexing {len(self.profile.skills)} skills...")
+            for skill in self.profile.skills:
+                text = self._skill_to_text(skill)
+                documents.append(text)
+                metadatas.append({
+                    "type": "skill",
+                    "skill_name": skill.skill_name,
+                    "confidence": skill.final_confidence,
+                    "category": skill.category,
+                    "sources": skill.sources
+                })
 
         # Index raw data sources
-        if 'cv' in self.profile.raw_data:
-            cv_data = self.profile.raw_data['cv']
-            if 'raw_text' in cv_data:
-                chunks = self._chunk_text(cv_data['raw_text'], chunk_size=400)
-                print(f"   Indexing {len(chunks)} CV chunks...")
-                for i, chunk in enumerate(chunks):
-                    documents.append(chunk)
-                    metadatas.append({
-                        "type": "cv_text",
-                        "source": "cv",
-                        "chunk_id": i
-                    })
+        if hasattr(self.profile, 'raw_data') and isinstance(self.profile.raw_data, dict):
+            # Index CV data
+            if 'cv' in self.profile.raw_data:
+                cv_data = self.profile.raw_data.get('cv', {})
+                if isinstance(cv_data, dict) and cv_data.get('raw_text'):
+                    raw_text = cv_data['raw_text']
+                    if isinstance(raw_text, str) and raw_text.strip():
+                        chunks = self._chunk_text(raw_text, chunk_size=400)
+                        print(f"   Indexing {len(chunks)} CV chunks...")
+                        for i, chunk in enumerate(chunks):
+                            documents.append(chunk)
+                            metadatas.append({
+                                "type": "cv_text",
+                                "source": "cv",
+                                "chunk_id": i
+                            })
 
-        # Index GitHub data
-        if 'github' in self.profile.raw_data:
-            github_data = self.profile.raw_data['github']
-            if 'repositories' in github_data:
-                repos = github_data['repositories']
-                print(f"   Indexing {len(repos)} GitHub repositories...")
-                for repo in repos[:10]:  # Limit to top 10
-                    repo_text = f"{repo.get('name', '')}: {repo.get('description', '')}. "
-                    repo_text += f"Languages: {', '.join(repo.get('languages', []))}. "
-                    repo_text += f"Topics: {', '.join(repo.get('topics', []))}"
-                    documents.append(repo_text)
-                    metadatas.append({
-                        "type": "github_repo",
-                        "source": "github",
-                        "repo_name": repo.get('name', '')
-                    })
+            # Index GitHub data
+            if 'github' in self.profile.raw_data:
+                github_data = self.profile.raw_data.get('github', {})
+                if isinstance(github_data, dict):
+                    repos = github_data.get('repositories', [])
+                    # Validate repos is a list
+                    if isinstance(repos, list) and repos:
+                        print(f"   Indexing {len(repos)} GitHub repositories...")
+                        for repo in repos[:10]:  # Limit to top 10
+                            if isinstance(repo, dict):
+                                repo_text = f"{repo.get('name', '')}: {repo.get('description', '')}. "
+                                languages = repo.get('languages', [])
+                                if isinstance(languages, list):
+                                    repo_text += f"Languages: {', '.join(languages)}. "
+                                topics = repo.get('topics', [])
+                                if isinstance(topics, list):
+                                    repo_text += f"Topics: {', '.join(topics)}"
+                                documents.append(repo_text)
+                                metadatas.append({
+                                    "type": "github_repo",
+                                    "source": "github",
+                                    "repo_name": repo.get('name', '')
+                                })
 
-        # Index personal statement
-        if 'personal_statement' in self.profile.raw_data:
-            statement_data = self.profile.raw_data['personal_statement']
-            if 'content' in statement_data:
-                documents.append(statement_data['content'])
-                metadatas.append({
-                    "type": "personal_statement",
-                    "source": "personal_statement"
-                })
+            # Index personal statement
+            if 'personal_statement' in self.profile.raw_data:
+                statement_data = self.profile.raw_data.get('personal_statement', {})
+                if isinstance(statement_data, dict):
+                    content = statement_data.get('content', '')
+                    if isinstance(content, str) and content.strip():
+                        documents.append(content)
+                        metadatas.append({
+                            "type": "personal_statement",
+                            "source": "personal_statement"
+                        })
 
         # Add to vector store
         if documents:
             self.vector_store.add_documents(documents, metadatas)
-            print(f"   ✓ RAG system ready with {len(documents)} indexed documents")
+            print(f"   RAG system ready with {len(documents)} indexed documents")
         else:
-            print(f"   ⚠️  No documents to index")
+            # Raise error if no documents found
+            raise ValueError(
+                "Cannot initialize RAG system: Profile has no indexable data. "
+                "Please ensure the profile has skills, CV text, GitHub data, or a personal statement."
+            )
 
     def _skill_to_text(self, skill) -> str:
         """Convert skill object to searchable text"""

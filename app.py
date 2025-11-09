@@ -386,6 +386,8 @@ def render_employer_qa_page():
                     api_key=api_key
                 )
                 st.session_state.rag_provider = llm_provider
+                # Clear chat history when switching providers
+                st.session_state.chat_messages = []
                 st.success(f"✅ RAG system ready with {llm_provider}")
             except Exception as e:
                 st.error(f"❌ Error initializing RAG system: {str(e)}")

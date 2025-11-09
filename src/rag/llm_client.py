@@ -58,6 +58,9 @@ class LLMClient:
             import google.generativeai as genai
             if self.api_key:
                 genai.configure(api_key=self.api_key)
+            else:
+                print("WARNING: No Gemini API key provided. Requests may fail or have limited quota.")
+                print("Get a free key at: https://makersuite.google.com/app/apikey")
             self.model = self.model or "gemini-2.0-flash-exp"
             self.client = genai.GenerativeModel(self.model)
 
@@ -100,7 +103,16 @@ class LLMClient:
             temperature=temperature,
             max_tokens=1024
         )
-        return response.choices[0].message.content
+
+        # Validate response structure
+        if not response or not hasattr(response, 'choices') or not response.choices:
+            raise ValueError("Invalid OpenAI response: No choices returned")
+
+        message_content = response.choices[0].message.content
+        if message_content is None or not isinstance(message_content, str):
+            raise ValueError("Invalid OpenAI response: Empty or invalid message content")
+
+        return message_content
 
     def _call_gemini(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
         """Call Google Gemini API"""
@@ -117,6 +129,24 @@ class LLMClient:
             generation_config=generation_config
         )
 
+        # Validate response
+        if not response:
+            raise ValueError("Invalid Gemini response: No response returned")
+
+        # Check if content was blocked
+        if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
+            block_reason = getattr(response.prompt_feedback, 'block_reason', None)
+            if block_reason:
+                raise ValueError(f"Gemini blocked the request: {block_reason}")
+
+        # Validate text content
+        if not hasattr(response, 'text') or not response.text:
+            # Check for candidates with finish_reason
+            if hasattr(response, 'candidates') and response.candidates:
+                finish_reason = getattr(response.candidates[0], 'finish_reason', 'UNKNOWN')
+                raise ValueError(f"Gemini returned no text. Finish reason: {finish_reason}")
+            raise ValueError("Invalid Gemini response: No text content returned")
+
         return response.text
 
     def _call_anthropic(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
@@ -130,7 +160,23 @@ class LLMClient:
                 {"role": "user", "content": user_prompt}
             ]
         )
-        return response.content[0].text
+
+        # Validate response structure
+        if not response:
+            raise ValueError("Invalid Anthropic response: No response returned")
+
+        if not hasattr(response, 'content') or not response.content:
+            raise ValueError("Invalid Anthropic response: No content blocks returned")
+
+        # Check stop reason
+        if hasattr(response, 'stop_reason') and response.stop_reason not in ['end_turn', None]:
+            raise ValueError(f"Anthropic stopped unexpectedly: {response.stop_reason}")
+
+        text_content = response.content[0].text
+        if not text_content or not isinstance(text_content, str):
+            raise ValueError("Invalid Anthropic response: Empty or invalid text content")
+
+        return text_content
 
     def get_provider_info(self) -> Dict[str, str]:
         """Get information about current provider"""
@@ -155,8 +201,8 @@ if __name__ == "__main__":
         response = client.generate(system_prompt, user_prompt)
         print(f"\nResponse: {response[:200]}...")
 
-        print("\n✓ LLM Client module loaded successfully")
+        print("\nLLM Client module loaded successfully")
     except Exception as e:
-        print(f"\n⚠️  Note: {str(e)}")
+        print(f"\nNote: {str(e)}")
         print("To test, set GEMINI_API_KEY environment variable")
         print("LLM Client module loaded (no API key configured)")

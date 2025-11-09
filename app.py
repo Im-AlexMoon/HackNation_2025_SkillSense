@@ -8,7 +8,23 @@ import plotly.express as px
 from pathlib import Path
 import sys
 import json
+import os
 from typing import Optional
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # If dotenv fails, try manual loading
+    env_file = Path(__file__).parent / '.env'
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / 'src'))

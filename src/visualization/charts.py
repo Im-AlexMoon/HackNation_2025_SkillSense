@@ -407,7 +407,7 @@ def create_required_vs_preferred(
     fig.update_layout(
         title="Required vs Preferred Skills Coverage",
         yaxis_title="Number of Skills",
-        height=350,
+        height=400,
         barmode="group",
         template="plotly_white",
         margin=dict(l=50, r=50, t=80, b=50),

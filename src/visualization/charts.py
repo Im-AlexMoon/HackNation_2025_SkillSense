@@ -43,12 +43,13 @@ def create_confidence_distribution(confidences: List[float]) -> go.Figure:
 
     # Fix: pd.cut returns tuple when retbins=True, unpack correctly
     binned_values, _ = pd.cut(confidences, bins=bins, retbins=True, labels=False, include_lowest=True)
-    counts = binned_values.value_counts().sort_index()
+    # Convert to Series to use value_counts
+    counts = pd.Series(binned_values).value_counts().sort_index()
 
     fig = go.Figure()
 
     for i, (label, color) in enumerate(zip(bin_labels, bin_colors)):
-        count = counts.get(i, 0) if isinstance(counts, dict) else (counts[i] if i in counts.index else 0)
+        count = counts.get(i, 0) if i in counts.index else 0
         fig.add_trace(
             go.Bar(
                 x=[label],
@@ -342,8 +343,10 @@ def create_skills_gap_waterfall(matched: int, required: int, preferred: int) -> 
         go.Waterfall(
             x=["Required", "Matched", "Gap (Required)", "Preferred", "Matched", "Gap (Preferred)"],
             y=[required, 0, -missing_required, preferred, 0, -missing_preferred],
-            measure=["relative", "relative", "relative", "relative", "relative", "relative"],
-            marker=dict(color=["#3B82F6", "#10B981", "#EF4444", "#8B5CF6", "#10B981", "#F59E0B"]),
+            measure=["absolute", "relative", "relative", "absolute", "relative", "relative"],
+            increasing={"marker": {"color": "#10B981"}},
+            decreasing={"marker": {"color": "#EF4444"}},
+            totals={"marker": {"color": "#3B82F6"}},
             connector={"line": {"color": "#6B7280", "dash": "dash"}},
             hovertemplate="<b>%{x}</b><br>Skills: %{y}<extra></extra>",
         )

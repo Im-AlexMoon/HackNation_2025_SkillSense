@@ -74,6 +74,7 @@ Thumbs.db
 
 # Project Specific
 *.pdf
+!docs/*.pdf
 *.xlsx
 *.csv
 cache/

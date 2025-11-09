@@ -4,7 +4,7 @@ Unified interface for OpenAI, Anthropic, and Google Gemini
 """
 import os
 from typing import Optional, List, Dict
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
 
 class LLMClient:
@@ -37,14 +37,17 @@ class LLMClient:
     def _get_api_key_from_env(self) -> Optional[str]:
         """Get API key from environment variables"""
         env_vars = {
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY"
+            "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],  # Support both env var names
+            "openai": ["OPENAI_API_KEY"],
+            "anthropic": ["ANTHROPIC_API_KEY"]
         }
 
-        env_var = env_vars.get(self.provider)
-        if env_var:
-            return os.getenv(env_var)
+        env_var_names = env_vars.get(self.provider, [])
+        # Try each possible environment variable name
+        for env_var in env_var_names:
+            api_key = os.getenv(env_var)
+            if api_key:
+                return api_key
         return None
 
     def _initialize_client(self):
@@ -69,10 +72,9 @@ class LLMClient:
             self.client = anthropic.Anthropic(api_key=self.api_key)
             self.model = self.model or "claude-3-5-haiku-20241022"
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def generate(self, system_prompt: str, user_prompt: str, temperature: float = 0.3) -> str:
         """
-        Generate response from LLM
+        Generate response from LLM with improved error handling
 
         Args:
             system_prompt: System/instruction prompt
@@ -83,6 +85,19 @@ class LLMClient:
             Generated text response
         """
         try:
+            return self._generate_with_retry(system_prompt, user_prompt, temperature)
+        except RetryError as e:
+            # Extract the actual underlying exception from RetryError
+            underlying_error = self._extract_underlying_error(e)
+            raise Exception(f"LLM generation failed after retries ({self.provider}): {underlying_error}")
+        except Exception as e:
+            # Re-raise other exceptions with context
+            raise Exception(f"LLM generation failed ({self.provider}): {str(e)}")
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def _generate_with_retry(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
+        """Internal method with retry logic"""
+        try:
             if self.provider == "openai":
                 return self._call_openai(system_prompt, user_prompt, temperature)
             elif self.provider == "gemini":
@@ -90,7 +105,52 @@ class LLMClient:
             elif self.provider == "anthropic":
                 return self._call_anthropic(system_prompt, user_prompt, temperature)
         except Exception as e:
-            raise Exception(f"LLM generation failed ({self.provider}): {str(e)}")
+            # Add helpful context to the exception
+            error_msg = str(e)
+
+            # Provide helpful guidance based on error type
+            if "DefaultCredentialsError" in str(type(e)) or "API_KEY" in error_msg or "api_key" in error_msg.lower():
+                if self.provider == "gemini":
+                    raise Exception(
+                        f"Gemini API key not found. Please set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.\n"
+                        f"Get a free key at: https://makersuite.google.com/app/apikey\n"
+                        f"Original error: {error_msg}"
+                    )
+                else:
+                    raise Exception(
+                        f"API key error for {self.provider}. Please check your API key configuration.\n"
+                        f"Original error: {error_msg}"
+                    )
+            elif "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                raise Exception(
+                    f"Rate limit or quota exceeded for {self.provider}.\n"
+                    f"Please wait a few minutes or upgrade your API plan.\n"
+                    f"Original error: {error_msg}"
+                )
+            elif "block" in error_msg.lower() or "safety" in error_msg.lower():
+                raise Exception(
+                    f"Content was blocked by {self.provider} safety filters.\n"
+                    f"Try modifying your prompt.\n"
+                    f"Original error: {error_msg}"
+                )
+            else:
+                # Re-raise with original message
+                raise
+
+    def _extract_underlying_error(self, retry_error: RetryError) -> str:
+        """Extract the actual error message from a RetryError"""
+        try:
+            if hasattr(retry_error, 'last_attempt'):
+                last_attempt = retry_error.last_attempt
+                if hasattr(last_attempt, 'exception') and callable(last_attempt.exception):
+                    underlying_exception = last_attempt.exception()
+                    if underlying_exception:
+                        return str(underlying_exception)
+        except Exception:
+            pass
+
+        # Fallback to the retry error's string representation
+        return str(retry_error)
 
     def _call_openai(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
         """Call OpenAI API"""

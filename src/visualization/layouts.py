@@ -263,56 +263,6 @@ def create_skill_detail_card(
         for evidence in evidence
     ])
 
-    card_html = f"""
-    <div style="
-        padding: 1.5rem;
-        border-radius: 12px;
-        background: white;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-    ">
-        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-            <div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #0F172A;">
-                    {skill_name}
-                </div>
-                <div style="font-size: 0.875rem; color: #6B7280; margin-top: 0.25rem;">
-                    {category.replace('_', ' ').title()}
-                </div>
-            </div>
-            <div style="
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 0.5rem;
-            ">
-                <div style="
-                    font-size: 1.875rem;
-                    font-weight: 700;
-                    color: {color};
-                ">
-                    {confidence:.0%}
-                </div>
-                <div style="font-size: 0.75rem; color: #6B7280;">
-                    Confidence
-                </div>
-            </div>
-        </div>
-
-        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #E5E7EB;">
-            <div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 0.5rem; font-weight: 500;">
-                Detected in:
-            </div>
-            {sources_html}
-        </div>
-
-        <div>
-            <div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 0.5rem; font-weight: 500;">
-                Evidence:
-            </div>
-            {evidence_html if evidence_html else '<div style="color: #9CA3AF; font-size: 0.875rem;">No evidence available</div>'}
-        </div>
-    </div>
-    """
+    card_html = f'<div style="padding: 1.5rem; border-radius: 12px; background: white; border: 1px solid #E5E7EB; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);"><div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;"><div><div style="font-size: 1.5rem; font-weight: 700; color: #0F172A;">{skill_name}</div><div style="font-size: 0.875rem; color: #6B7280; margin-top: 0.25rem;">{category.replace("_", " ").title()}</div></div><div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;"><div style="font-size: 1.875rem; font-weight: 700; color: {color};">{confidence:.0%}</div><div style="font-size: 0.75rem; color: #6B7280;">Confidence</div></div></div><div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #E5E7EB;"><div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 0.5rem; font-weight: 500;">Detected in:</div>{sources_html}</div><div><div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 0.5rem; font-weight: 500;">Evidence:</div>{evidence_html if evidence_html else "<div style=\"color: #9CA3AF; font-size: 0.875rem;\">No evidence available</div>"}</div></div>'
 
     st.markdown(card_html, unsafe_allow_html=True)

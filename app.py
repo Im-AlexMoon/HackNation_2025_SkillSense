@@ -8,13 +8,31 @@ import plotly.express as px
 from pathlib import Path
 import sys
 import json
+import os
 from typing import Optional
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # If dotenv fails, try manual loading
+    env_file = Path(__file__).parent / '.env'
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / 'src'))
 
 from profile_generation.profile_builder import ProfileBuilder
 from analysis.job_matcher import JobMatcher
+from rag.rag_system import RAGSystem
+from rag.prompts import QUICK_QUESTIONS
 
 
 # Page configuration
@@ -81,33 +99,56 @@ def render_header():
 
 
 def render_data_input_page():
-    """Render data input page"""
+    """Render data input page - supports simultaneous multi-source input"""
     st.header("📊 Data Input")
-    st.markdown("Provide your information from multiple sources for comprehensive skill analysis")
+    st.markdown("Provide information from **multiple sources** for comprehensive skill analysis. You can use any combination of sources below:")
 
-    # Create tabs for different input methods
-    tab1, tab2, tab3 = st.tabs(["📄 Upload CV", "💻 Connect GitHub", "✍️ Text Input"])
+    # Initialize session state for collected inputs
+    if 'collected_inputs' not in st.session_state:
+        st.session_state.collected_inputs = {}
 
-    with tab1:
-        st.subheader("Upload Your CV (PDF)")
-        cv_file = st.file_uploader("Upload CV in PDF format", type=['pdf'])
-        if cv_file:
-            # Save uploaded file temporarily
-            temp_path = Path("temp_cv.pdf")
-            with open(temp_path, 'wb') as f:
-                f.write(cv_file.getbuffer())
-            st.success("✅ CV uploaded successfully!")
-            return {'cv_path': str(temp_path)}
+    # Dictionary to accumulate all inputs from this render
+    inputs = {}
 
-    with tab2:
-        st.subheader("Connect Your GitHub Profile")
-        github_username = st.text_input("GitHub Username", placeholder="e.g., octocat")
+    # Section 1: CV Upload (supports multiple files)
+    with st.expander("📄 Upload CV(s)", expanded=True):
+        st.markdown("Upload one or more CVs in PDF format")
+        cv_files = st.file_uploader(
+            "Upload CV(s) in PDF format",
+            type=['pdf'],
+            accept_multiple_files=True,
+            key="cv_uploader"
+        )
+
+        if cv_files:
+            import uuid
+            cv_paths = []
+            for idx, cv_file in enumerate(cv_files):
+                # Generate unique temp file name
+                temp_path = Path(f"temp_cv_{uuid.uuid4().hex[:8]}.pdf")
+                with open(temp_path, 'wb') as f:
+                    f.write(cv_file.getbuffer())
+                cv_paths.append(str(temp_path))
+
+            inputs['cv_paths'] = cv_paths
+            st.success(f"CV(s) uploaded: {len(cv_paths)} file(s)")
+
+    # Section 2: GitHub Connection
+    with st.expander("💻 Connect GitHub Profile", expanded=True):
+        st.markdown("Fetch repositories, contributions, and project data")
+        github_username = st.text_input(
+            "GitHub Username",
+            placeholder="e.g., octocat",
+            key="github_input"
+        )
+
         if github_username:
+            inputs['github_username'] = github_username
             st.info(f"Will fetch data for: github.com/{github_username}")
-            return {'github_username': github_username}
 
-    with tab3:
-        st.subheader("Provide Text Information")
+    # Section 3: Text Input
+    with st.expander("✍️ Text Input", expanded=True):
+        st.markdown("Provide additional context through text")
 
         col1, col2 = st.columns(2)
 
@@ -115,41 +156,91 @@ def render_data_input_page():
             personal_statement = st.text_area(
                 "Personal Statement",
                 placeholder="Describe your background, skills, and career goals...",
-                height=200
+                height=200,
+                key="statement_input"
             )
 
         with col2:
             reference_letter = st.text_area(
                 "Reference Letter (Optional)",
                 placeholder="Paste a reference letter or recommendation...",
-                height=200
+                height=200,
+                key="reference_input"
             )
 
         if personal_statement:
-            return {
-                'personal_statement': personal_statement,
-                'reference_letter': reference_letter if reference_letter else None
-            }
+            inputs['personal_statement'] = personal_statement
+        if reference_letter:
+            inputs['reference_letter'] = reference_letter
+
+    # Display collected sources summary
+    if inputs:
+        st.markdown("---")
+        st.subheader("📋 Collected Sources")
+
+        sources = []
+        if 'cv_paths' in inputs:
+            sources.append(f"CV(s): {len(inputs['cv_paths'])} file(s)")
+        if 'github_username' in inputs:
+            sources.append(f"GitHub: {inputs['github_username']}")
+        if 'personal_statement' in inputs:
+            sources.append("Personal Statement")
+        if 'reference_letter' in inputs:
+            sources.append("Reference Letter")
+
+        for source in sources:
+            st.markdown(f"- {source}")
+
+        return inputs
 
     return None
 
 
 def build_profile_from_inputs(inputs: dict):
-    """Build profile from user inputs"""
-    with st.spinner("🔍 Analyzing your data and extracting skills..."):
+    """Build profile from user inputs - supports multi-source simultaneous processing"""
+    # Display processing progress
+    sources_to_process = []
+    if inputs.get('cv_paths'):
+        sources_to_process.append(f"{len(inputs['cv_paths'])} CV file(s)")
+    if inputs.get('github_username'):
+        sources_to_process.append("GitHub")
+    if inputs.get('personal_statement'):
+        sources_to_process.append("Personal Statement")
+    if inputs.get('reference_letter'):
+        sources_to_process.append("Reference Letter")
+
+    progress_text = f"Processing: {', '.join(sources_to_process)}"
+
+    with st.spinner(f"🔍 {progress_text}..."):
         try:
+            # Build profile with all sources
             profile = st.session_state.profile_builder.build_profile(
                 name=inputs.get('name', 'User'),
-                cv_path=inputs.get('cv_path'),
+                cv_paths=inputs.get('cv_paths'),  # Now supports multiple CVs
                 github_username=inputs.get('github_username'),
                 personal_statement=inputs.get('personal_statement'),
                 reference_letter=inputs.get('reference_letter')
             )
             st.session_state.profile = profile
-            st.success("✅ Profile analysis complete!")
+
+            # Show success with source breakdown
+            st.success("Profile analysis complete!")
+
+            # Display which sources contributed
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Skills", len(profile.skills))
+            with col2:
+                st.metric("Data Sources", len(profile.data_sources))
+            with col3:
+                sources_list = ', '.join(profile.data_sources)
+                st.metric("Sources Used", sources_list)
+
             return True
         except Exception as e:
-            st.error(f"❌ Error building profile: {str(e)}")
+            st.error(f"Error building profile: {str(e)}")
+            import traceback
+            st.error(f"Details: {traceback.format_exc()}")
             return False
 
 
@@ -325,6 +416,187 @@ def create_radar_chart(skills):
     return fig
 
 
+def render_employer_qa_page():
+    """Render Employer Q&A page with RAG system"""
+    if st.session_state.profile is None:
+        st.warning("⚠️ Please build a candidate profile first in the Data Input page")
+        return
+
+    st.header("💬 Employer Q&A - Ask About This Candidate")
+    st.markdown("Ask natural language questions about the candidate's skills, experience, and qualifications")
+
+    # Sidebar settings
+    with st.sidebar:
+        st.subheader("🔧 RAG Settings")
+
+        # LLM Provider selection
+        llm_provider = st.selectbox(
+            "LLM Provider",
+            ["gemini", "openai", "anthropic"],
+            help="Gemini is free tier, OpenAI and Anthropic require API keys"
+        )
+
+        # API Key input (optional)
+        with st.expander("⚙️ API Configuration"):
+            api_key_input = st.text_input(
+                f"{llm_provider.upper()} API Key",
+                type="password",
+                help=f"Optional: Enter your {llm_provider.upper()} API key"
+            )
+
+        # Display options
+        show_evidence = st.checkbox("Show Evidence Citations", value=True)
+        show_similarity = st.checkbox("Show Similarity Scores", value=False)
+
+        st.divider()
+
+        # Profile info
+        st.subheader("📊 Candidate Info")
+        st.write(f"**Name:** {st.session_state.profile.name or 'Unknown'}")
+        st.metric("Total Skills", len(st.session_state.profile.skills))
+        st.metric("Data Sources", len(st.session_state.profile.data_sources))
+
+        # Reset conversation button
+        if st.button("🔄 Reset Conversation"):
+            if 'rag_system' in st.session_state:
+                st.session_state.rag_system.reset_conversation()
+            if 'chat_messages' in st.session_state:
+                st.session_state.chat_messages = []
+            st.rerun()
+
+    # Initialize RAG system
+    if 'rag_system' not in st.session_state or st.session_state.get('rag_provider') != llm_provider:
+        with st.spinner(f"🔍 Initializing RAG system with {llm_provider}..."):
+            try:
+                api_key = api_key_input if api_key_input else None
+                st.session_state.rag_system = RAGSystem(
+                    st.session_state.profile,
+                    llm_provider=llm_provider,
+                    api_key=api_key
+                )
+                st.session_state.rag_provider = llm_provider
+                # Clear chat history when switching providers
+                st.session_state.chat_messages = []
+                st.success(f"✅ RAG system ready with {llm_provider}")
+            except Exception as e:
+                st.error(f"❌ Error initializing RAG system: {str(e)}")
+                st.info("💡 Tip: For Gemini, you may not need an API key. For OpenAI/Anthropic, enter your API key in the sidebar.")
+                return
+
+    # Initialize chat history
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
+
+    # Display chat history
+    for msg in st.session_state.chat_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+            # Show evidence if available and enabled
+            if show_evidence and msg.get("sources") and msg["role"] == "assistant":
+                with st.expander("📚 View Evidence & Sources"):
+                    for i, src in enumerate(msg["sources"], 1):
+                        st.markdown(f"**[{i}] {src['type'].replace('_', ' ').title()}**")
+                        st.info(src['text'])
+
+                        if show_similarity:
+                            st.caption(f"Similarity: {src.get('similarity', 0):.2f}")
+
+                        if src.get('skill_name'):
+                            st.caption(f"Skill: {src['skill_name']} | Confidence: {src.get('confidence', 0):.2f}")
+
+    # Chat input
+    if prompt := st.chat_input("Ask about this candidate... (e.g., 'Does this candidate have Python experience?')"):
+        # Add user message
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Generate response
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing profile..."):
+                try:
+                    answer, sources = st.session_state.rag_system.query(prompt)
+
+                    # Display answer
+                    st.markdown(answer)
+
+                    # Add to chat history
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": sources
+                    })
+
+                    # Show evidence
+                    if show_evidence and sources:
+                        with st.expander("📚 View Evidence & Sources"):
+                            for i, src in enumerate(sources, 1):
+                                st.markdown(f"**[{i}] {src['type'].replace('_', ' ').title()}**")
+                                st.info(src['text'])
+
+                                if show_similarity:
+                                    st.caption(f"Similarity: {src.get('similarity', 0):.2f}")
+
+                                if src.get('skill_name'):
+                                    st.caption(f"Skill: {src['skill_name']} | Confidence: {src.get('confidence', 0):.2f}")
+
+                except Exception as e:
+                    error_msg = f"❌ Error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": error_msg,
+                        "sources": []
+                    })
+
+        st.rerun()
+
+    # Quick question templates
+    if len(st.session_state.chat_messages) == 0:
+        st.divider()
+        st.subheader("💡 Quick Question Templates")
+        st.markdown("Click a question to ask it:")
+
+        # Create tabs for question categories
+        tabs = st.tabs(list(QUICK_QUESTIONS.keys()))
+
+        for tab, (category, questions) in zip(tabs, QUICK_QUESTIONS.items()):
+            with tab:
+                for question in questions:
+                    if st.button(question, key=f"quick_{category}_{question[:20]}"):
+                        # Trigger query
+                        st.session_state.pending_query = question
+                        st.rerun()
+
+        # Handle pending query
+        if 'pending_query' in st.session_state:
+            query = st.session_state.pending_query
+            del st.session_state.pending_query
+
+            # Add to chat and process
+            st.session_state.chat_messages.append({"role": "user", "content": query})
+
+            with st.spinner("Analyzing profile..."):
+                try:
+                    answer, sources = st.session_state.rag_system.query(query)
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": sources
+                    })
+                except Exception as e:
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": f"Error: {str(e)}",
+                        "sources": []
+                    })
+
+            st.rerun()
+
+
 def render_export_page():
     """Render export and download page"""
     if st.session_state.profile is None:
@@ -395,7 +667,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to:",
-        ["🏠 Home", "📊 Data Input", "🎓 Skill Profile", "💼 Job Matching", "💾 Export"]
+        ["🏠 Home", "📊 Data Input", "🎓 Skill Profile", "💼 Job Matching", "💬 Employer Q&A", "💾 Export"]
     )
 
     # Demo mode
@@ -456,6 +728,9 @@ def main():
 
     elif page == "💼 Job Matching":
         render_job_matching_page()
+
+    elif page == "💬 Employer Q&A":
+        render_employer_qa_page()
 
     elif page == "💾 Export":
         render_export_page()

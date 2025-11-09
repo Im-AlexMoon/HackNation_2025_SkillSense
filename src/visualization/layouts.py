@@ -91,90 +91,21 @@ def create_job_card(
         missing_skills: Number of missing skills
         description: Job description
     """
-    match_percentage = match_score * 100
+    match_percentage = int(match_score * 100)
 
     if match_score >= 0.8:
         color = "#10B981"
-        level = "Excellent"
     elif match_score >= 0.6:
         color = "#06B6D4"
-        level = "Good"
     elif match_score >= 0.4:
         color = "#F59E0B"
-        level = "Fair"
     else:
         color = "#EF4444"
-        level = "Poor"
 
     company_html = f'<div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 0.5rem;">{company}</div>' if company else ""
-
     desc_html = f'<div style="font-size: 0.875rem; color: #6B7280; margin-top: 1rem; line-height: 1.5;">{description}</div>' if description else ""
 
-    card_html = f"""
-    <div style="
-        padding: 1.5rem;
-        border-radius: 12px;
-        background: white;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        height: 100%;
-    ">
-        <div style="display: flex; justify-content: space-between; align-items: start;">
-            <div>
-                <div style="font-size: 1.125rem; font-weight: 700; color: #0F172A;">
-                    {job_title}
-                </div>
-                {company_html}
-            </div>
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 60px;
-                height: 60px;
-                border-radius: 8px;
-                background-color: {color}20;
-                font-weight: 700;
-                color: {color};
-                font-size: 1.5rem;
-            ">
-                {match_percentage:.0f}%
-            </div>
-        </div>
-
-        <div style="
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        ">
-            <div style="color: #10B981; font-weight: 500;">
-                Matched: {matched_skills}
-            </div>
-            <div style="color: #EF4444; font-weight: 500;">
-                Missing: {missing_skills}
-            </div>
-        </div>
-
-        <div style="
-            width: 100%;
-            height: 4px;
-            background-color: #E5E7EB;
-            border-radius: 2px;
-            margin-top: 1rem;
-            overflow: hidden;
-        ">
-            <div style="
-                height: 100%;
-                width: {match_percentage}%;
-                background-color: {color};
-                border-radius: 2px;
-            "></div>
-        </div>
-
-        {desc_html}
-    </div>
-    """
+    card_html = f'<div style="padding: 1.5rem; border-radius: 12px; background: white; border: 1px solid #E5E7EB; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); height: 100%;"><div style="display: flex; justify-content: space-between; align-items: start;"><div><div style="font-size: 1.125rem; font-weight: 700; color: #0F172A;">{job_title}</div>{company_html}</div><div style="display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 8px; background-color: {color}20; font-weight: 700; color: {color}; font-size: 1.5rem;">{match_percentage}%</div></div><div style="display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.875rem;"><div style="color: #10B981; font-weight: 500;">Matched: {matched_skills}</div><div style="color: #EF4444; font-weight: 500;">Missing: {missing_skills}</div></div><div style="width: 100%; height: 4px; background-color: #E5E7EB; border-radius: 2px; margin-top: 1rem; overflow: hidden;"><div style="height: 100%; width: {match_percentage}%; background-color: {color}; border-radius: 2px;"></div></div>{desc_html}</div>'
 
     st.markdown(card_html, unsafe_allow_html=True)
 

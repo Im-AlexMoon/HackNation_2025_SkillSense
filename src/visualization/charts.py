@@ -41,12 +41,14 @@ def create_confidence_distribution(confidences: List[float]) -> go.Figure:
         CONFIDENCE_COLORS["very_high"],
     ]
 
-    counts, _ = pd.cut(confidences, bins=bins, retbins=True, labels=False, include_lowest=True).value_counts().sort_index(), bins
+    # Fix: pd.cut returns tuple when retbins=True, unpack correctly
+    binned_values, _ = pd.cut(confidences, bins=bins, retbins=True, labels=False, include_lowest=True)
+    counts = binned_values.value_counts().sort_index()
 
     fig = go.Figure()
 
     for i, (label, color) in enumerate(zip(bin_labels, bin_colors)):
-        count = counts.get(i, 0)
+        count = counts.get(i, 0) if isinstance(counts, dict) else (counts[i] if i in counts.index else 0)
         fig.add_trace(
             go.Bar(
                 x=[label],
@@ -279,10 +281,10 @@ def create_match_score_gauge(score: float, title: str = "Match Score") -> go.Fig
     fig = go.Figure(
         data=[
             go.Indicator(
-                mode="gauge+number+delta",
+                mode="gauge+number",
                 value=percentage,
                 title={"text": title},
-                delta={"reference": 80, "prefix": "vs target"},
+                number={"suffix": "%"},
                 gauge={
                     "axis": {"range": [0, 100]},
                     "bar": {"color": color},
@@ -298,8 +300,6 @@ def create_match_score_gauge(score: float, title: str = "Match Score") -> go.Fig
                         "value": 90,
                     },
                 },
-                suffix="%",
-                text=level,
             )
         ]
     )
@@ -307,6 +307,16 @@ def create_match_score_gauge(score: float, title: str = "Match Score") -> go.Fig
     fig.update_layout(
         height=350,
         margin=dict(l=50, r=50, t=80, b=50),
+        annotations=[{
+            "text": level,
+            "x": 0.5,
+            "y": 0.2,
+            "xref": "paper",
+            "yref": "paper",
+            "showarrow": False,
+            "font": {"size": 16, "color": color},
+            "xanchor": "center"
+        }]
     )
 
     return fig
@@ -422,6 +432,7 @@ def create_profile_completeness_gauge(completeness: float) -> go.Figure:
                 mode="gauge+number",
                 value=percentage,
                 title={"text": "Profile Completeness"},
+                number={"suffix": "%"},
                 gauge={
                     "axis": {"range": [0, 100]},
                     "bar": {"color": COLOR_PALETTE["secondary"]},
@@ -432,7 +443,6 @@ def create_profile_completeness_gauge(completeness: float) -> go.Figure:
                         {"range": [75, 100], "color": "#DCFCE7"},
                     ],
                 },
-                suffix="%",
             )
         ]
     )
